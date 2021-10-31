@@ -5,6 +5,9 @@ var bcrypt = require("bcrypt");
 var jwt = require('jsonwebtoken')
 const {upload,uploadImage} = require('../middleware/upload')
 require('dotenv').config()
+var sendEmail = require("../utils/SendEmail");
+var Token = require('../models/TokenModel')
+
 
 /* GET users listing. */
 
@@ -137,8 +140,85 @@ router.post('/settings',authenticate,uploadImage,upload,async(req,res)=>{
     
   }
  
-  
-
-
 })
+
+router.post("/forgetPassword", async (req, res, next) => {
+  let token =""
+  try {
+    let user = await Author.findOne(
+      { _id: req.body.id },
+      { userName:0 }
+    );
+
+    if (user) {
+      //user found then generate a token and send in mail and save it in db for checking in future
+      try {
+        let userToken = await Token.findOne(
+          { _id: req.body.id },
+          { token:1,_id:0}
+        );
+        if(userToken.token)
+        {
+          token = userToken.token
+          console.log("im from already exited token")
+  
+        }
+      } catch (error) {
+        token = jwt.sign({ _id: req.body.id }, `${process.env.ENCRYPYION_KEY}`);
+        const userToken = new Token({
+          _id: req.body.id,
+          token: token,
+        }).save();
+        console.log("im from new token")
+        
+      }
+      const link = `${process.env.BASE_URL}/authors/password-reset/${user._id}/${token}`;
+
+      console.log(link)
+      await sendEmail(user._id, "Password reset", link);
+      res.send("password reset link sent to your email account");
+
+    } else {
+      res.status(500).send("user Not Found..!!");
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+});
+
+
+router.post("/password-reset/:userId/:token", async (req, res) => {
+  const userId = req.params.userId;
+  const token = req.params.token;
+  const password = req.body.password;
+  console.log(token)
+  try {
+    let user = await Token.findOne({ _id: userId });
+    if (user) {
+      let compareToken = (user.token == token)
+      console.log(compareToken)
+      if (compareToken) {
+        // change the password of the user..
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+        req.body.password = hash;
+        let passChange = await Author.findByIdAndUpdate(
+          { _id: userId },
+          { password: req.body.password }
+        );
+        res.json({
+          message: "Password changed..!!",
+        });
+      }
+    }
+  } catch (error) {
+    console.log(error)
+    res.status(500).send(error.message);
+
+  }
+});
+
 module.exports = router;
