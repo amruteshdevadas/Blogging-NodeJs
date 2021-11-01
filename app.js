@@ -15,7 +15,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 mongo.connect()
 app.use(logger('dev'));
-app.use(express.json());
+app.use(express.json({limit:'10mb'}));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));

@@ -3,6 +3,12 @@ var router = express.Router();
 require("dotenv").config();
 var jwt = require("jsonwebtoken");
 var Post = require("../models/Posts");
+var cloudinary = require('cloudinary').v2;
+cloudinary.config({
+    cloud_name: `${process.env.CLOUDINARY_NAME}`,
+    api_key: `${process.env.CLOUDINARY_API_KEY}`,
+    api_secret: `${process.env.CLOUDINARY_API_SECRET}`,
+});
 
 function authenticate(req, res, next) {
   if (req.headers.authorization) {
@@ -14,16 +20,22 @@ function authenticate(req, res, next) {
     res.send("No Token Present");
   }
 }
-
-
-
 router.post("/createPost", authenticate, async (req, res, next) => {
   try {
     const { title, image, content } = req.body.newPost;
     console.log(req.body.newPost);
+      try {
+        const uploadResponse = await cloudinary.uploader.upload(image, {
+          upload_preset: 'blogging',
+      });
+      console.log(uploadResponse);
+      var imageLink = uploadResponse.url
+      } catch (error) {
+        console.log(error.message)
+      }
     let post = new Post({
       author: req.userId,
-      image: image,
+      image: imageLink,
       title: title,
       content: content,
       createdAt: new Date(),
@@ -31,7 +43,7 @@ router.post("/createPost", authenticate, async (req, res, next) => {
     await Post.collection.insertOne(post);
     res.send("Post Successfully Added");
   } catch (error) {
-    res.send(error.message);
+    // res.send(error.message);
     console.log(error);
   }
 });

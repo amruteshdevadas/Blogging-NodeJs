@@ -7,6 +7,13 @@ const {upload,uploadImage} = require('../middleware/upload')
 require('dotenv').config()
 var sendEmail = require("../utils/SendEmail");
 var Token = require('../models/TokenModel')
+// var cloudinary = require('../utils/Cloudinary')
+var cloudinary = require('cloudinary').v2;
+cloudinary.config({
+    cloud_name: `${process.env.CLOUDINARY_NAME}`,
+    api_key: `${process.env.CLOUDINARY_API_KEY}`,
+    api_secret: `${process.env.CLOUDINARY_API_SECRET}`,
+});
 
 
 /* GET users listing. */
@@ -107,37 +114,29 @@ router.get('/getUser',authenticate,async(req,res,next)=>{
     }
 })
 
-router.post('/settings',authenticate,uploadImage,upload,async(req,res)=>{
+router.post('/settings',authenticate, async(req,res)=>{
   let id = req.userId
-  try {
-  let userData = await Author.findOne({_id:id})
-  let userName = req.body.userName
-  let about = req.body.about
-   if(req.file)
-   {
-    let filePath = req.file.path
-    try {
-      await Author.updateOne({_id:id},{$set:{avatar:filePath,userName:userName,about:about}})
-      res.send("File updated Successfully")
-    } catch (error) {
-      res.send(error.message)
-      console.log(error)
-    }
-   }
-   else{
-    let filePath = userData.avatar
-    try {
-      await Author.updateOne({_id:id},{$set:{avatar:filePath,userName:userName,about:about}})
-      res.send("File updated Successfully")
-    } catch (error) {
-      res.send(error.message)
-      console.log(error)
-    }
-   }
-  } catch (error) {
+ const{avatar,about,userName}= req.body.data
+try 
+    {
+      if(avatar)
+      {
+          try {
+            const uploadResponse = await cloudinary.uploader.upload(avatar, {
+              upload_preset: 'blogging',
+          });
+          console.log(uploadResponse);
+          var imageLink = uploadResponse.url
+          } catch (error) {
+            console.log(error.message)
+          }
+        }
+      await Author.updateOne({_id:id},{$set:{about:about,userName:userName,avatar:imageLink}})
+      res.send("Updated Successfully")
+}
+catch (error) {
     res.send(error.message)
-    console.log(error)
-    
+    console.log(error) 
   }
  
 })
